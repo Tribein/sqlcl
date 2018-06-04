@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<aliases>
+    <alias name="inv">
+        <description/>
+        <queries>
+            <query>
+                <sql><![CDATA[select owner,object_type,count(1) cnt from dba_objects where status<>'VALID' group by rollup (owner,object_type) having (grouping(owner)=1 or grouping(owner)+grouping(object_type)=0) order by 1,3]]></sql>
+            </query>
+        </queries>
+    </alias>
+</aliases>
