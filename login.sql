@@ -48,8 +48,23 @@ col partition_name format a32
 col subpartition_name format a32
 col username format a32
 col tablespace_name format a32
+col file_name format a32
 col name format a32
 col member format a32
+col status format a16
+col blocksize format 999999999
+col thread format 9
+col sequence format 999999999
+col group format 99
+col sqltext format a64
+col file_id format 999
+col members format 9
+col bytes format 999999999999999
+col value format a16
+col type format a24
+col description format a32
+col sessid format a16
+col property_name format a32
 alias load alias.sqlcl
 column USERDB new_value userdb
 set termout off

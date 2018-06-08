@@ -1,10 +1,122 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <aliases>
+    <alias name="sud">
+        <description><![CDATA[undo usage by session]]></description>
+        <queries>
+            <query>
+                <sql><![CDATA[select a.sid||','||a.serial# sessid,a.username,a.status,b.xidusn,b.used_urec,b.used_ublk from v$session a join v$transaction b on (a.saddr=b.ses_addr) where  b.used_urec is not null and b.used_ublk is not null]]></sql>
+            </query>
+        </queries>
+    </alias>
+    <alias name="srd">
+        <description><![CDATA[redo usage by session]]></description>
+        <queries>
+            <query>
+                <sql><![CDATA[select 
+sid,
+username,
+logon_time,
+name,
+round(value/1024/1024/1024) REDOGB 
+from v$sesstat join v$statname using(statistic#) 
+join v$session using(sid) 
+where round(value/1024/1024/1024)<>0 and name ='redo size' 
+order by value desc]]></sql>
+            </query>
+        </queries>
+    </alias>
+    <alias name="usc">
+        <description><![CDATA[underscore parameter by keyword(description or name)]]></description>
+        <queries>
+            <query>
+                <sql><![CDATA[select a.ksppinm name,
+b.ksppstvl value,
+b.ksppstdf deflt,
+decode(	
+	a.ksppity, 
+	1,'boolean', 
+	2,'string', 
+	3,'number', 
+	4,'file', 
+	a.ksppity
+) type,
+a.ksppdesc description 
+from sys.x$ksppi a, sys.x$ksppcv b 
+where a.indx = b.indx and a.ksppinm like '\_%' escape '\' and (regexp_like(a.ksppinm,:txt,'i') or regexp_like(a.ksppdesc,:txt,'i'))
+order by 1]]></sql>
+            </query>
+        </queries>
+    </alias>
+    <alias name="dst">
+        <description><![CDATA[display database dst properties and tz file version]]></description>
+        <queries>
+            <query>
+                <sql><![CDATA[SELECT PROPERTY_NAME,SUBSTR (property_value, 1, 16) value FROM DATABASE_PROPERTIES WHERE  PROPERTY_NAME LIKE 'DST_%'
+UNION ALL
+SELECT FILENAME,TO_CHAR(VERSION) FROM V$TIMEZONE_FILE]]></sql>
+            </query>
+        </queries>
+    </alias>
+    <alias name="log">
+        <description><![CDATA[logfiles info]]></description>
+        <queries>
+            <query>
+                <sql><![CDATA[select thread# "THREAD",group# "GROUP",c.STATUS,type,member,MEMBERS,sequence# "SEQUENCE",BYTES,blocksize,ARCHIVED 
+from V$LOGFILE a left join V$LOG c using(group#) where thread# is not null
+union all 
+select b.thread#,group#,b.STATUS,type,member,nvl(members,1),b.sequence#,b.BYTES,b.blocksize,b.ARCHIVED 
+from V$STANDBY_LOG b left join V$LOG using(group#) left join v$logfile using (group#)
+order by 1,2]]></sql>
+            </query>
+        </queries>
+    </alias>
+    <alias name="tpc">
+        <description><![CDATA[purge distributed transactions]]></description>
+        <queries>
+            <query>
+                <sql><![CDATA[select 'exec sys.dbms_transaction.purge_lost_db_entry('''||LOCAL_TRAN_ID||''');' from dba_2pc_pending]]></sql>
+            </query>
+        </queries>
+    </alias>
     <alias name="inv">
-        <description/>
+        <description><![CDATA[invalid objects by owner,type with grand total]]></description>
         <queries>
             <query>
                 <sql><![CDATA[select owner,object_type,count(1) cnt from dba_objects where status<>'VALID' group by rollup (owner,object_type) having (grouping(owner)=1 or grouping(owner)+grouping(object_type)=0) order by 1,3]]></sql>
+            </query>
+        </queries>
+    </alias>
+    <alias name="shr">
+        <description><![CDATA[shrink space above hwm from datafile(>100MB only)]]></description>
+        <queries>
+            <query>
+                <sql><![CDATA[select a.name file_name,
+  round ( (a.blocks * a.block_size - nvl (c.hwm, 1) * a.block_size)/1024/1024) "SAVE_MB",
+  round ( d.bytes /1024/1024) "FREE_MB",
+  'alter database datafile '||a.file#||' resize '|| to_char ( greatest (8,round ( (nvl (c.hwm, 1) * a.block_size + a.block_size) / 1024 / 1024) + 8))||'M;' "SQLTEXT"
+from v$datafile a
+left join (select file_id, max(block_id + blocks - 1) hwm  from dba_extents group by file_id) c on (c.file_id = a.file#)
+left join ( select file_id, sum (bytes) bytes from dba_free_space group by file_id ) d on (d.file_id = a.file#)
+where a.blocks * a.block_size - nvl (c.hwm, 1) * a.block_size > 100*1024 * 1024 /*100MB*/
+order by 2 desc]]></sql>
+            </query>
+        </queries>
+    </alias>
+    <alias name="exp">
+        <description><![CDATA[expand sql text for query by sqlid]]></description>
+        <queries>
+            <query>
+                <sql><![CDATA[DECLARE
+  l_outtxt		CLOB;
+  l_sqltxt		clob;
+BEGIN
+  select sql_fulltext into l_sqltxt from v$sqlarea where sql_id=:sqlid;
+  DBMS_UTILITY.EXPAND_SQL_TEXT(
+	input_sql_text  => l_sqltxt,
+	output_sql_text => l_outtxt
+  );
+  dbms_output.put_line(l_outtxt);
+end;]]></sql>
             </query>
         </queries>
     </alias>
